@@ -20,7 +20,6 @@ DROP FUNCTION IF EXISTS get_available_courses();
 DROP FUNCTION IF EXISTS get_courses_with_prerequisites_status();
 DROP FUNCTION IF EXISTS enroll_student();
 DROP FUNCTION IF EXISTS get_student_gpa();
-DROP FUNCTION IF EXISTS update_cumulative_gpa();
 DROP FUNCTION IF EXISTS create_course_and_assign_professor();
 DROP FUNCTION IF EXISTS create_exam_and_check_conflict();
 	
@@ -800,6 +799,32 @@ BEGIN
     UPDATE Student
     SET cgpa = COALESCE(cumulative_gpa, 0.00) -- Default to 0.00 if no grades
     WHERE student_id = my_student_id;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP FUNCTION get_student_gpa(integer);
+CREATE OR REPLACE FUNCTION get_student_gpa(my_student_id INT)
+RETURNS TABLE (
+    semester VARCHAR(255),
+    offered_year INT,
+    gpa DECIMAL(4, 2)
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        e.semester,
+        e.offered_year,
+        ROUND(SUM(e.final_grade) / COUNT(e.final_grade) / 25, 2) AS gpa
+        
+    FROM 
+        Enrolls e
+    WHERE 
+        e.student_id = my_student_id
+        AND e.final_grade IS NOT NULL
+    GROUP BY 
+        e.semester, e.offered_year, e.student_id
+    ORDER BY 
+        e.offered_year, e.semester;
 END;
 $$ LANGUAGE plpgsql;
 
